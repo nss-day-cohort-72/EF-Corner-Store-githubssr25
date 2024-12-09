@@ -10,4 +10,5 @@ public class Product
     public Category Category { get; set; } = null!; // Navigation property, nullability handled
 
     public List<OrderProduct> OrderProducts { get; set; } = new(); // Navigation property
+
 }

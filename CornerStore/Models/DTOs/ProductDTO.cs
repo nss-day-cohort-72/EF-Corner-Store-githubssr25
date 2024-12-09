@@ -17,5 +17,4 @@ public class ProductDTO
     public string Brand { get; set; } = string.Empty;
     public int CategoryId { get; set; }
     public string CategoryName { get; set; } = string.Empty; 
-    public int Quantity { get; set; } // Added quantity for ProductDTO
 }

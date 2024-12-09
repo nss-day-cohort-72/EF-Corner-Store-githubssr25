@@ -19,6 +19,17 @@ namespace CornerStore.Mapping
             // Product -> ProductDTO
             CreateMap<Product, ProductDTO>()
                 .ForMember(dest => dest.CategoryName, opt => opt.MapFrom(src => src.Category.CategoryName));
+
+             CreateMap<CreateProductDTO, Product>(); 
+            
+            // 2️⃣ Product -> ProductDTO
+            CreateMap<Product, ProductDTO>()
+                .ForMember(dest => dest.CategoryName, opt => opt.MapFrom(src => src.Category.CategoryName));
+
+
+            // 3️⃣ UpdateProductDTO -> Product (for PATCH updates)
+            CreateMap<UpdateProductDTO, Product>()
+                .ForAllMembers(opts => opts.Condition((src, dest, srcMember) => srcMember != null)); // Only map non-null values
         }
     }
 }
