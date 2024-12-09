@@ -2,7 +2,7 @@ using AutoMapper;
 using CornerStore.Models;
 using CornerStore.Models.DTOs;
 
-namespace CornerStore.Mapping 
+namespace CornerStore.Mapping
 {
     public class MappingProfile : Profile
     {
@@ -16,12 +16,17 @@ namespace CornerStore.Mapping
             CreateMap<Order, OrderDTO>()
                 .ForMember(dest => dest.Total, opt => opt.MapFrom(src => src.OrderProducts.Sum(op => op.Product.Price * op.Quantity)));
 
+            CreateMap<Order, OrderDTO>()
+            .ForMember(dest => dest.Products, opt =>
+                opt.MapFrom(src => src.OrderProducts.Select(op => op.Product)));
+
+
             // Product -> ProductDTO
             CreateMap<Product, ProductDTO>()
                 .ForMember(dest => dest.CategoryName, opt => opt.MapFrom(src => src.Category.CategoryName));
 
-             CreateMap<CreateProductDTO, Product>(); 
-            
+            CreateMap<CreateProductDTO, Product>();
+
             // 2️⃣ Product -> ProductDTO
             CreateMap<Product, ProductDTO>()
                 .ForMember(dest => dest.CategoryName, opt => opt.MapFrom(src => src.Category.CategoryName));

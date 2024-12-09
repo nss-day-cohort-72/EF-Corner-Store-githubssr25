@@ -426,8 +426,78 @@ return Results.Ok(new {
 });
 
 
+//    public int CashierId { get; set; }
+    // public DateTime? PaidOnDate { get; set; }
+
+app.MapPost("/orders", async (CornerStoreDbContext db, CreateOrderDTO newOrderDTO, IMapper mapper) => 
+{
+
+// Step 1: Validate input
+    if (!newOrderDTO.PaidOnDate.HasValue || newOrderDTO.PaidOnDate.Value == default)
+    {
+        return Results.BadRequest("PaidOnDate is required and must be a valid date.");
+    }
+// newOrderDTO.PaidOnDate.Value == default:
+// If PaidOnDate has a value, this checks whether the value is the "default" value for DateTime, i.e., 01/01/0001 00:00:00.
+// The purpose of this line is to ensure that:
+// PaidOnDate is not null, and
+// The value of PaidOnDate is not an invalid "default" date like 01/01/0001, which could occur if the value was initialized but not set correctly.
+
+//int productId = ProductsWithQuantities.Keys.First();
+//int quantity = ProductsWithQuantities.Values.First();
 
 
+
+var cashier = db.Cashiers.FirstOrDefault(eachCashier => eachCashier.Id == newOrderDTO.CashierId);
+
+var ourOrder = new Order {
+    CashierId = newOrderDTO.CashierId,
+    Cashier = cashier,
+    PaidOnDate = newOrderDTO.PaidOnDate,
+};
+
+db.Orders.Add(ourOrder); 
+await db.SaveChangesAsync();
+
+// Get all products at once (batch query)
+var productIds = newOrderDTO.ProductsWithQuantities.Keys.ToList();
+var products = await db.Products.Include(product =>product.Category).Where(product => productIds.Contains(product.Id)).ToListAsync();
+
+// Create OrderProducts
+var ourOPJoinTable = newOrderDTO.ProductsWithQuantities.Select(
+    eachProductQuantity => new OrderProduct {
+        OrderId = ourOrder.Id,
+        ProductId = eachProductQuantity.Key,
+        Quantity = eachProductQuantity.Value,
+        Order = ourOrder, // This tells EF Core to associate the Order
+        Product = products.FirstOrDefault(product => product.Id == eachProductQuantity.Key) 
+    }).ToList();
+
+// foreach(var eachOP in ourOPJoinTable){
+//     db.OrderProducts.Add(eachOP);
+// };
+
+    db.OrderProducts.AddRange(ourOPJoinTable);
+    await db.SaveChangesAsync(); // Save all changes
+
+    // Return the created order as an OrderDTO
+    var orderDTO = mapper.Map<OrderDTO>(ourOrder);
+    return Results.Created($"/orders/{ourOrder.Id}", orderDTO); 
+
+
+
+// var products = db.Products.Select(eachProduct => eachProduct.OrderProducts.Where(eachOP => eachOP.ProductId.Contains()).ToList());
+
+// var productsForJoin = db.Products.Where(eachProduct => eachProduct.OrderProducts.Any(
+//     eachOP => ourOPJoinTable.Any(eachOPJoin => eachOPJoin.ProductId == eachOP.ProductId)));
+
+// foreach(var product in productsForJoin){
+//     product.OrderProducts.AddRange(ourOPJoinTable.Where(
+//         ourOPJoin => ourOPJoin.ProductId == product.Id));
+// }
+
+
+});
 
 
 
