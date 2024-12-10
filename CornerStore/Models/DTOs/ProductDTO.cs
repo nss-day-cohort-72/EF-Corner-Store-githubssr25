@@ -16,5 +16,7 @@ public class ProductDTO
     public decimal Price { get; set; }
     public string Brand { get; set; } = string.Empty;
     public int CategoryId { get; set; }
+
+    public int? QuantitySold { get; set;}
     public string CategoryName { get; set; } = string.Empty; 
 }
