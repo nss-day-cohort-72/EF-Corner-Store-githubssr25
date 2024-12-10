@@ -11,8 +11,6 @@ using CornerStore.Mapping;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Add services to the container.
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -80,7 +78,7 @@ app.MapPost("/cashiers", async (CornerStoreDbContext db, CreateCashierDTO create
 
 app.MapGet("/cashiers", async (CornerStoreDbContext db, IMapper mapper) => 
 {
-    // Step 1: Load cashiers with their related orders, order products, and products
+
     var cashiers = await db.Cashiers
         .Include(c => c.Orders)
             .ThenInclude(o => o.OrderProducts)
@@ -88,7 +86,7 @@ app.MapGet("/cashiers", async (CornerStoreDbContext db, IMapper mapper) =>
                     .ThenInclude(p => p.Category) // Single chain for product & category
         .ToListAsync();
 
-    // Step 2: Create an anonymous object, following the CashierDTO-like structure but also including Orders and Products
+    // Create an anonymous object, following the CashierDTO-like structure but also including Orders and Products
     var anonymousDTOs = cashiers.Select(c => new 
     {
         Id = c.Id,
@@ -122,92 +120,6 @@ app.MapGet("/cashiers", async (CornerStoreDbContext db, IMapper mapper) =>
 });
 
 
-
-// app.MapGet("/cashiers", async (CornerStoreDbContext db, IMapper mapper) => 
-// {
-//     // Step 1: Load cashiers with their related orders, order products, and products
-//     var cashiers = await db.Cashiers
-//         .Include(c => c.Orders)
-//             .ThenInclude(o => o.OrderProducts)
-//                 .ThenInclude(op => op.Product)
-//         .Include(c => c.Orders)
-//             .ThenInclude(o => o.OrderProducts)
-//                 .ThenInclude(op => op.Product.Category)
-//         .ToListAsync();
-
-//     // Step 2: Create an anonymous object, following the CashierDTO-like structure but also including Orders and Products
-//     var anonymousDTOs = cashiers.Select(c => new 
-//     {
-//         Id = c.Id,
-//         FirstName = c.FirstName,
-//         LastName = c.LastName,
-//         FullName = $"{c.FirstName} {c.LastName}",
-//         OrderIds = c.Orders.Select(o => o.Id).ToList(), // Match the List<int> OrderIds required by CashierDTO
-//         Orders = c.Orders.Select(o => new OrderDTO 
-//         {
-//             Id = o.Id,
-//             CashierId = o.CashierId,
-//             PaidOnDate = o.PaidOnDate,
-//             Total = o.OrderProducts.Sum(op => op.Product.Price * op.Quantity),
-//             OrderProducts = o.OrderProducts.Select(op => new OrderProduct 
-//             {
-//                 OrderId = op.OrderId,
-//                 ProductId = op.ProductId,
-//                 Quantity = op.Quantity
-//             }).ToList()
-//         }).ToList(),
-//         Products = c.Orders
-//             .SelectMany(o => o.OrderProducts)
-//             .Select(op => new ProductDTO 
-//             {
-//                 Id = op.Product.Id,
-//                 ProductName = op.Product.ProductName,
-//                 Price = op.Product.Price,
-//                 Brand = op.Product.Brand,
-//                 CategoryId = op.Product.CategoryId,
-//                 CategoryName = op.Product.Category.CategoryName
-//             })
-//             .Distinct()
-//             .ToList()
-//     });
-
-//     return Results.Ok(anonymousDTOs);
-// });
-
-
-// app.MapGet("/cashiers", async (CornerStoreDbContext db, CashierDTO cashierDTO) => {
-
-// var cashiers = db.Cashiers.Include(c => c.Orders)
-//                            .ThenInclude(cO => cO.OrderProducts);
-
-// var cashierWithProduct = db.Cashiers.Select(c => new {
-//     Id = c.Id,
-//     FirstName = c.FirstName,
-//     LastName = c.LastName,
-//     FullName = c.FullName,
-//     Orders = c.Orders.Select( o => new Order {
-//         Id = o.Id,
-//         CashierId = o.CashierId,
-//         Cashier = o.Cashier,
-//         PaidOnDate = o.PaidOnDate,
-//         OrderProducts = o.OrderProducts
-//         }),
-//     Products = c.Orders.SelectMany(op => op.OrderProducts)
-//                 .Select( oPJoin => new Product {
-//                     Id = oPJoin.ProductId,
-//                     ProductName = db.Products.FirstOrDefault(p => p.Id == oPJoin.ProductId).ProductName,
-//                     Price = db.Products.FirstOrDefault(p => p.Id == oPJoin.ProductId).Price,
-//                     Brand = db.Products.FirstOrDefault(p => p.Id == oPJoin.ProductId).Brand,
-//                     CategoryId = db.Products.FirstOrDefault(p => p.Id == oPJoin.ProductId).CategoryId,
-//                     Category = db.Products.FirstOrDefault(p => p.Id == oPJoin.ProductId).Category,
-//                 }).ToList()
-//     });
-
-// }
-// );
-
-
-
 //3rd endpoint in assginment 
 
 app.MapGet("/products", async (CornerStoreDbContext db, string? search) => 
@@ -237,7 +149,7 @@ app.MapGet("/products", async (CornerStoreDbContext db, string? search) =>
 app.MapPost("/products", async (CornerStoreDbContext db, CreateProductDTO newProductDTO, IMapper mapper) => 
 {
     // Step 1: Validate input
-    if (string.IsNullOrWhiteSpace(newProductDTO.ProductName) || newProductDTO.Price <= 0 || newProductDTO.Quantity < 0)
+    if (string.IsNullOrWhiteSpace(newProductDTO.ProductName) || newProductDTO.Price <= 0)
     {
         return Results.BadRequest("ProductName is required, Price must be greater than 0, and Quantity cannot be negative.");
     }
@@ -246,12 +158,24 @@ app.MapPost("/products", async (CornerStoreDbContext db, CreateProductDTO newPro
     {
         var newProduct = mapper.Map<Product>(newProductDTO);
 
+         var category = await db.Categories.FirstOrDefaultAsync(c => c.Id == newProductDTO.CategoryId);
+        
+        if (category == null)
+        {
+            return Results.BadRequest($"Category with Id {newProductDTO.CategoryId} not found.");
+        }
+        //whole reason we are doing this is beore category was returning null even if weh ad categoryId werent actually including it when adding it 
+        newProduct.Category = category; 
+
         db.Products.Add(newProduct);
         await db.SaveChangesAsync();
 
         // Step 4: Return the newly created product as a DTO
         var createdProductDTO = mapper.Map<ProductDTO>(newProduct);
+         createdProductDTO.QuantitySold  = 0;
+
         return Results.Created($"/products/{newProduct.Id}", createdProductDTO);
+       
     }
     catch (Exception ex)
     {
@@ -291,7 +215,7 @@ app.MapGet("/orders/{orderId}", async (CornerStoreDbContext db, int orderId, IMa
 
 var ourOrder = await db.Orders
     .Include(o => o.Cashier)
-        .ThenInclude(c => c.Orders) // Include the Orders of the Cashier
+        .ThenInclude(c => c.Orders)
             .ThenInclude(co => co.OrderProducts) // Include the OrderProducts of the Cashier's Orders
     .Include(o => o.OrderProducts) // Include the OrderProducts for the main order
         .ThenInclude(op => op.Product) // Include the Product for the OrderProducts
@@ -357,22 +281,29 @@ return Results.Ok(ourOrderDTO);
 
 app.MapGet("/orders", async (CornerStoreDbContext db, string? orderDate, IMapper mapper) =>
 {
-    var ourOrder = await db.Orders
-    .Include(o => o.Cashier)
-        .ThenInclude(c => c.Orders) // Include the Orders of the Cashier
-            .ThenInclude(co => co.OrderProducts) // Include the OrderProducts of the Cashier's Orders
-    .Include(o => o.OrderProducts) // Include the OrderProducts for the main order
-        .ThenInclude(op => op.Product) // Include the Product for the OrderProducts
-        .ThenInclude(p => p.Category) 
+    // Step 1: Get all orders with necessary related data
+    var ourOrders = await db.Orders
+        .Include(o => o.Cashier) 
+        .Include(o => o.OrderProducts)
+            .ThenInclude(op => op.Product)
+            .ThenInclude(p => p.Category)
         .ToListAsync();
 
-    if(!string.IsNullOrWhiteSpace(orderDate) && DateTime.TryParse(orderDate, out DateTime parsedDate)){
-        ourOrder.Where(o => o.PaidOnDate.HasValue && o.PaidOnDate.Value.Date == parsedDate.Date).ToList();
-
+    // Step 2: Filter orders by orderDate if the query param is provided and valid
+    if (!string.IsNullOrWhiteSpace(orderDate) && DateTime.TryParse(orderDate, out DateTime parsedDate))
+    {
+        ourOrders = ourOrders
+            .Where(o => o.PaidOnDate.HasValue && o.PaidOnDate.Value.Date == parsedDate.Date)
+            .ToList();
     }
 
-               
+    // Step 3: Map the orders to OrderDTO to ensure the response is formatted properly
+    var orderDTOs = ourOrders.Select(order => mapper.Map<OrderDTO>(order)).ToList();
+
+    // Step 4: Return the orders as the response
+    return Results.Ok(orderDTOs);
 });
+
 
 app.MapDelete("/orders/{id}", async (CornerStoreDbContext db, int id, IMapper mapper) =>
 {
@@ -381,7 +312,7 @@ var ourOrder = await db.Orders
     .Include(o => o.Cashier)
         .ThenInclude(c => c.Orders) // Include the Orders of the Cashier
             .ThenInclude(co => co.OrderProducts) // Include the OrderProducts of the Cashier's Orders
-    .Include(o => o.OrderProducts) // Include the OrderProducts for the main order
+    .Include(o => o.OrderProducts) 
         .ThenInclude(op => op.Product) // Include the Product for the OrderProducts
         .ThenInclude(p => p.Category) // category was null befoer including this 
     .FirstOrDefaultAsync(o => o.Id == id);
@@ -400,12 +331,6 @@ var cashier = await db.Cashiers.Include(c => c.Orders)
                                 .FirstOrDefaultAsync();
 
 cashier?.Orders.Remove(cashier.Orders.FirstOrDefault(order => order.Id == id));
-
-//wont work cashier?.Orders.Remove(order => order.Id == id); 
-//Remove() expects a single item (an object) to be passed as an argument.order => order.Id == id is a predicate (condition), not an object.
-// Remove() only works when you FirstOrDefault():
-// FirstOrDefault finds the specific order in the list of orders that matches the condition (order.Id == id).
-// If it finds it, it returns the specific order object.pass the exact instance (object reference) you want to remove.
 
 ourOrder.OrderProducts.Remove(ourOrder.OrderProducts.FirstOrDefault(opJoin => opJoin.OrderId == id));
 
@@ -426,26 +351,14 @@ return Results.Ok(new {
 });
 
 
-//    public int CashierId { get; set; }
-    // public DateTime? PaidOnDate { get; set; }
-
 app.MapPost("/orders", async (CornerStoreDbContext db, CreateOrderDTO newOrderDTO, IMapper mapper) => 
 {
 
-// Step 1: Validate input
+
     if (!newOrderDTO.PaidOnDate.HasValue || newOrderDTO.PaidOnDate.Value == default)
     {
         return Results.BadRequest("PaidOnDate is required and must be a valid date.");
     }
-// newOrderDTO.PaidOnDate.Value == default:
-// If PaidOnDate has a value, this checks whether the value is the "default" value for DateTime, i.e., 01/01/0001 00:00:00.
-// The purpose of this line is to ensure that:
-// PaidOnDate is not null, and
-// The value of PaidOnDate is not an invalid "default" date like 01/01/0001, which could occur if the value was initialized but not set correctly.
-
-//int productId = ProductsWithQuantities.Keys.First();
-//int quantity = ProductsWithQuantities.Values.First();
-
 
 
 var cashier = db.Cashiers.FirstOrDefault(eachCashier => eachCashier.Id == newOrderDTO.CashierId);
@@ -473,9 +386,7 @@ var ourOPJoinTable = newOrderDTO.ProductsWithQuantities.Select(
         Product = products.FirstOrDefault(product => product.Id == eachProductQuantity.Key) 
     }).ToList();
 
-// foreach(var eachOP in ourOPJoinTable){
-//     db.OrderProducts.Add(eachOP);
-// };
+
 
     db.OrderProducts.AddRange(ourOPJoinTable);
     await db.SaveChangesAsync(); // Save all changes
@@ -486,24 +397,153 @@ var ourOPJoinTable = newOrderDTO.ProductsWithQuantities.Select(
 
 
 
-// var products = db.Products.Select(eachProduct => eachProduct.OrderProducts.Where(eachOP => eachOP.ProductId.Contains()).ToList());
-
-// var productsForJoin = db.Products.Where(eachProduct => eachProduct.OrderProducts.Any(
-//     eachOP => ourOPJoinTable.Any(eachOPJoin => eachOPJoin.ProductId == eachOP.ProductId)));
-
-// foreach(var product in productsForJoin){
-//     product.OrderProducts.AddRange(ourOPJoinTable.Where(
-//         ourOPJoin => ourOPJoin.ProductId == product.Id));
-// }
-
-
 });
 
 
 
+app.MapGet("/products/popular", async (CornerStoreDbContext db, string? amount, IMapper mapper) =>
+{
+    // Step 1: Set the number of products to return (default to 5 if not specified)
+    int amountToReturn = string.IsNullOrEmpty(amount) ? 5 : int.Parse(amount); // Defaults to 5 if 'amount' is null or empty
+
+
+var product = await db.Products
+    .Include(p => p.Category) 
+    .Include(p => p.OrderProducts) 
+        .ThenInclude(op => op.Order) // Include Orders linked through OrderProducts
+    .ToListAsync();
+var popularProducts = product
+    .GroupBy(p => p.Id)
+    .Select(orderGroup => 
+    {
+        // Extract the ProductId for this group
+        var productId = orderGroup.Key;
+
+        // Flatten the list of OrderProducts from all products in this group
+//         flattenedOrderProducts = [
+//   { OrderId: 1, Quantity: 2 }, 
+//   { OrderId: 2, Quantity: 2 }, 
+//   { OrderId: 3, Quantity: 1 }, 
+//   { OrderId: 4, Quantity: 3 } ]
+//for productId 2 
+// Flattened OrderProducts = [
+//   { OrderId: 5, Quantity: 4 }, 
+//   { OrderId: 6, Quantity: 1 }]
+
+//NOTE IF NO SELECT MANY 
+// flattenedOrderProducts = [ [ 
+//     { OrderId: 1, Quantity: 2 }, 
+//     { OrderId: 2, Quantity: 2 }, 
+//     { OrderId: 3, Quantity: 1 } 
+//   ],
+//   [ 
+//     { OrderId: 4, Quantity: 3 } 
+//   ] ]
+
+        var flattenedOrderProducts = orderGroup
+            .SelectMany(p => p.OrderProducts)
+            .ToList();
+
+ //Calcu the total quantity sold for this product
+        var totalQuantitySold = flattenedOrderProducts
+            .Sum(op => op.Quantity); // Sum the Quantity of all OrderProducts for this ProductId
+
+      //Return the ProductId and the total quantity sold for that ProductId
+        return new 
+        {
+            ProductId = productId, 
+            TotalQuantitySold = totalQuantitySold // Final total of all quantities for this product
+        };
+    })
+    .OrderByDescending(p => p.TotalQuantitySold)
+    .Take(amountToReturn)
+    .ToList(); // Convert the final result into a list
+
+// value you would get for it popularProducts = [
+//   { ProductId: 1, TotalQuantitySold: 8 }, 
+//   { ProductId: 2, TotalQuantitySold: 5 }
+// ]
+
+var overallProductDTO = new List<ProductDTO>();
+
+foreach(var indProduct in popularProducts){
+
+    var theProductWithInfo = db.Products.FirstOrDefault(eachP => eachP.Id == indProduct.ProductId);
+
+    var theProductDTO = new ProductDTO {
+        ProductName = theProductWithInfo.ProductName,
+        Price = theProductWithInfo.Price,
+        Brand = theProductWithInfo.Brand,
+        CategoryId = theProductWithInfo.CategoryId,
+        QuantitySold = indProduct.TotalQuantitySold,
+        CategoryName = db.Categories.FirstOrDefault(c => c.Id == theProductWithInfo.CategoryId).CategoryName
+    };
+
+ overallProductDTO.Add(theProductDTO);
+};
+
+    // Step 5: Return the final list of popular products
+    return Results.Ok(overallProductDTO);
+
+});
 
 
 app.Run();
 
+
+
+
+
 //don't move or change this!
 public partial class Program { }
+
+
+
+
+
+// var groupedProducts = product.GroupBy(
+//     p => p.Id)
+//     .Select(orderGroup => new
+//     { Id = orderGroup.Key,
+//         ProductName = orderGroup.Select(p => p.ProductName).ToList(), 
+//         Quantity = orderGroup.SelectMany(p => p.OrderProducts
+//         .GroupBy(
+//             eachOP => eachOP.Quantity
+//         ))
+// .Select(eachGroupBy => new {
+//     ProductId = orderGroup.Key,
+//     Quantity = eachGroupBy.Key
+// })
+
+
+//     });
+
+//if you want to do it in way that has a 2nd groupBy btw for last problem this is it 
+// var groupedProducts = product
+//     .GroupBy(p => p.Id)
+//     .Select(orderGroup => 
+//     {
+//         var productId = orderGroup.Key;
+
+//         var flattenedOrderProducts = orderGroup
+//             .SelectMany(p => p.OrderProducts)
+//             .ToList();
+
+//         var groupedByProductId = flattenedOrderProducts
+//             .GroupBy(op => op.ProductId)
+//             .Select(eachGroup => new 
+//             {
+//                 ProductId = eachGroup.Key, 
+//                 TotalQuantitySold = eachGroup.Sum(op => op.Quantity) 
+//             })
+//             .ToList();
+
+//         return new 
+//         {
+//             ProductId = productId, 
+//             TotalQuantitySold = groupedByProductId.FirstOrDefault()?.TotalQuantitySold 
+//         };
+//     })
+//     .ToList();
+
+

@@ -10,5 +10,7 @@ public class Product
     public Category Category { get; set; } = null!; // Navigation property, nullability handled
 
     public List<OrderProduct> OrderProducts { get; set; } = new(); // Navigation property
+    //having = new{} is important MEANS WHEN THIS IS INSTNATIATED ORDERPRODUCTS WILL DEFAULT TO EMPTY
+    //NOT NULL EVNE IF WE DONT SPECIFY IT 
 
 }
